@@ -1,13 +1,15 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ProposalOutput } from '@/lib/proposalEngine';
+import { ProposalOutput, ProposalInput } from '@/lib/proposalEngine';
 import { CheckCircle2, TrendingUp, Zap, BarChart3 } from 'lucide-react';
+import ProposalLogicExplainer from './ProposalLogicExplainer';
 
 interface ProposalResultProps {
   proposal: ProposalOutput;
+  input: ProposalInput;
 }
 
-export default function ProposalResult({ proposal }: ProposalResultProps) {
+export default function ProposalResult({ proposal, input }: ProposalResultProps) {
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('ja-JP', {
       style: 'currency',
@@ -29,7 +31,10 @@ export default function ProposalResult({ proposal }: ProposalResultProps) {
 
   return (
     <div className="space-y-6 animate-slide-up">
-      {/* 選定理由 */}
+      {/* 提案ロジック説明 */}
+      <ProposalLogicExplainer input={input} proposal={proposal} />
+
+      {/* 選定理由（詳細） */}
       <Card className="card-elevated border-l-4 border-l-primary">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -233,9 +238,12 @@ export default function ProposalResult({ proposal }: ProposalResultProps) {
       </Card>
 
       {/* 注釈 */}
-      <div className="text-xs text-muted-foreground bg-muted/50 rounded-lg p-3">
+      <div className="text-xs text-muted-foreground bg-muted/50 rounded-lg p-3 space-y-2">
         <p>
           ※ この提案は入力情報に基づいた自動提案です。実際の提案内容はマイナビ転職の担当者と相談の上、決定してください。
+        </p>
+        <p>
+          💡 上部の「提案ロジックの詳細説明」をクリックすると、プラン選定ルールと難易度スコアの計算方法が表示されます。
         </p>
       </div>
     </div>

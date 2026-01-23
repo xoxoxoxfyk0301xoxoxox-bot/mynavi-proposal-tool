@@ -6,13 +6,15 @@ import { Sparkles } from 'lucide-react';
 
 export default function Home() {
   const [proposal, setProposal] = useState<ProposalOutput | null>(null);
+  const [input, setInput] = useState<ProposalInput | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleGenerateProposal = (input: ProposalInput) => {
+  const handleGenerateProposal = (formInput: ProposalInput) => {
     setIsLoading(true);
+    setInput(formInput);
     // Simulate async operation
     setTimeout(() => {
-      const result = generateProposal(input);
+      const result = generateProposal(formInput);
       setProposal(result);
       setIsLoading(false);
     }, 500);
@@ -47,8 +49,8 @@ export default function Home() {
 
           {/* 右側：提案結果 */}
           <div>
-            {proposal ? (
-              <ProposalResult proposal={proposal} />
+            {proposal && input ? (
+              <ProposalResult proposal={proposal} input={input} />
             ) : (
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
