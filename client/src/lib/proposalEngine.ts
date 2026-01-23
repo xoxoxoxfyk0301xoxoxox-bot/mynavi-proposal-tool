@@ -317,14 +317,16 @@ function selectOptions(input: ProposalInput, selectedPlan: string): PlanOption[]
     options.push(OPTIONS.premiumScout as PlanOption);
   }
 
-  // 露出強化オプション
+  // 露出強化オプション（MT-Sのみ）
   const difficultyScore = calculateDifficultyScore(input);
-  if (difficultyScore > 2.0 && input.hiringCount >= 5) {
-    options.push(OPTIONS.topReserve as PlanOption);
-  }
+  if (selectedPlan === 'MT-S') {
+    if (difficultyScore > 2.0 && input.hiringCount >= 5) {
+      options.push(OPTIONS.topReserve as PlanOption);
+    }
 
-  if (input.hiringCount >= 10) {
-    options.push(OPTIONS.platinumPlus as PlanOption);
+    if (input.hiringCount >= 10) {
+      options.push(OPTIONS.platinumPlus as PlanOption);
+    }
   }
 
   return options;
