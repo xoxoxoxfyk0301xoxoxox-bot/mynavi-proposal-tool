@@ -1,7 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ProposalOutput } from '@/lib/proposalEngine';
-import { CheckCircle2, TrendingUp } from 'lucide-react';
+import { CheckCircle2, TrendingUp, Zap, BarChart3 } from 'lucide-react';
 
 interface ProposalResultProps {
   proposal: ProposalOutput;
@@ -17,6 +17,15 @@ export default function ProposalResult({ proposal }: ProposalResultProps) {
   };
 
   const difficultyPercentage = Math.min((proposal.reasoning.difficultyScore / 5) * 100, 100);
+
+  // 難易度の詳細説明
+  const getDifficultyLabel = (value: number) => {
+    if (value <= 1) return '低い';
+    if (value <= 1.5) return '低～中';
+    if (value <= 2) return '中';
+    if (value <= 2.5) return '中～高';
+    return '高い';
+  };
 
   return (
     <div className="space-y-6 animate-slide-up">
@@ -39,11 +48,32 @@ export default function ProposalResult({ proposal }: ProposalResultProps) {
                 />
               </div>
               <span className="text-sm font-semibold text-foreground min-w-fit">
-                {proposal.reasoning.difficultyScore.toFixed(2)}
+                {proposal.reasoning.difficultyScore.toFixed(2)} / 5.0
               </span>
             </div>
           </div>
-          <p className="text-sm text-foreground leading-relaxed">
+
+          {/* 難易度の詳細内訳 */}
+          <div className="grid grid-cols-2 gap-3 pt-2 border-t">
+            <div className="text-xs">
+              <p className="text-muted-foreground">採用ターゲット難易度</p>
+              <p className="font-semibold text-foreground">{proposal.reasoning.difficultyBreakdown.target.toFixed(2)}</p>
+            </div>
+            <div className="text-xs">
+              <p className="text-muted-foreground">採用人数難易度</p>
+              <p className="font-semibold text-foreground">{proposal.reasoning.difficultyBreakdown.count.toFixed(2)}</p>
+            </div>
+            <div className="text-xs">
+              <p className="text-muted-foreground">職種難易度</p>
+              <p className="font-semibold text-foreground">{proposal.reasoning.difficultyBreakdown.jobType.toFixed(2)}</p>
+            </div>
+            <div className="text-xs">
+              <p className="text-muted-foreground">採用時期難易度</p>
+              <p className="font-semibold text-foreground">{proposal.reasoning.difficultyBreakdown.period.toFixed(2)}</p>
+            </div>
+          </div>
+
+          <p className="text-sm text-foreground leading-relaxed pt-2">
             {proposal.reasoning.selectedReason}
           </p>
         </CardContent>
@@ -82,6 +112,40 @@ export default function ProposalResult({ proposal }: ProposalResultProps) {
           </div>
         </CardContent>
       </Card>
+
+      {/* チケットプラン */}
+      {proposal.ticketPlans.length > 0 && (
+        <Card className="card-elevated border-l-4 border-l-accent">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Zap className="w-5 h-5 text-accent" />
+              チケットプラン（長期掲載）
+            </CardTitle>
+            <CardDescription>複数クール掲載で割引が適用されます</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {proposal.ticketPlans.map((ticket) => (
+                <div key={ticket.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors">
+                  <div>
+                    <p className="font-semibold text-foreground">{ticket.name}</p>
+                    <p className="text-xs text-muted-foreground">掲載期間：{ticket.period}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-bold text-primary font-mono">{formatPrice(ticket.price)}</p>
+                    <Badge variant="secondary" className="mt-1">
+                      {ticket.savingsPercentage}%割引
+                    </Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground mt-4 pt-4 border-t">
+              💡 {proposal.reasoning.ticketRecommendation}
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* オプション */}
       {proposal.options.length > 0 && (
@@ -125,7 +189,10 @@ export default function ProposalResult({ proposal }: ProposalResultProps) {
       {/* 金額サマリー */}
       <Card className="card-elevated bg-gradient-to-br from-primary/5 to-accent/5 border-primary/20">
         <CardHeader>
-          <CardTitle>金額サマリー</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <BarChart3 className="w-5 h-5 text-primary" />
+            金額サマリー
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">

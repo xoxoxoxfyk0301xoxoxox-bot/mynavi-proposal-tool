@@ -22,6 +22,14 @@ export interface PlanOption {
   features: string[];
 }
 
+export interface TicketPlan {
+  id: string;
+  name: string;
+  period: string;
+  price: number;
+  savingsPercentage: number;
+}
+
 export interface ProposalOutput {
   plan: {
     id: string;
@@ -31,6 +39,7 @@ export interface ProposalOutput {
     features: string[];
     searchRank: string;
   };
+  ticketPlans: TicketPlan[];
   options: PlanOption[];
   pricing: {
     basePlan: number;
@@ -41,10 +50,51 @@ export interface ProposalOutput {
   };
   reasoning: {
     difficultyScore: number;
+    difficultyBreakdown: {
+      target: number;
+      count: number;
+      jobType: number;
+      period: number;
+    };
     selectedReason: string;
     optionReasons: string[];
+    ticketRecommendation: string;
   };
 }
+
+// チケット料金表
+const TICKET_PLANS: Record<string, Record<number, number>> = {
+  'MT-S': {
+    2: 2100000,
+    3: 3000000,
+    6: 5400000,
+    12: 9000000,
+  },
+  'MT-A': {
+    2: 1350000,
+    3: 1900000,
+    6: 3300000,
+    12: 5700000,
+  },
+  'MT-B': {
+    2: 875000,
+    3: 1150000,
+    6: 2100000,
+    12: 3600000,
+  },
+  'MT-C': {
+    2: 600000,
+    3: 800000,
+    6: 1500000,
+    12: 2400000,
+  },
+  'MT-D': {
+    2: 360000,
+    3: 510000,
+    6: 900000,
+    12: 1500000,
+  },
+};
 
 // 基本企画の定義
 const PLANS = {
@@ -164,9 +214,14 @@ const OPTIONS = {
 };
 
 /**
- * 採用難易度スコアを計算
+ * 採用難易度スコアの詳細な内訳を計算
  */
-function calculateDifficultyScore(input: ProposalInput): number {
+function calculateDifficultyBreakdown(input: ProposalInput): {
+  target: number;
+  count: number;
+  jobType: number;
+  period: number;
+} {
   // ターゲット別難易度
   const targetDifficulty: Record<string, number> = {
     '新卒': 1,
@@ -206,7 +261,20 @@ function calculateDifficultyScore(input: ProposalInput): number {
   const job = jobDifficulty[input.jobType] || 1.5;
   const period = periodDifficulty[input.desiredHiringPeriod] || 1;
 
-  return (target + countDifficulty + job + period) / 4;
+  return {
+    target,
+    count: countDifficulty,
+    jobType: job,
+    period,
+  };
+}
+
+/**
+ * 採用難易度スコアを計算
+ */
+function calculateDifficultyScore(input: ProposalInput): number {
+  const breakdown = calculateDifficultyBreakdown(input);
+  return (breakdown.target + breakdown.count + breakdown.jobType + breakdown.period) / 4;
 }
 
 /**
@@ -236,46 +304,68 @@ function selectPlan(difficultyScore: number, budget: number): string {
  */
 function selectOptions(input: ProposalInput, selectedPlan: string): PlanOption[] {
   const options: PlanOption[] = [];
-  const reasons: string[] = [];
 
   // スカウト機能の提案
   if (input.hiringCount >= 5) {
     options.push(OPTIONS.scoutProxy as PlanOption);
-    reasons.push('採用人数が5人以上のため、スカウト代行で効率的な採用活動が可能');
   } else if (input.hiringCount >= 3) {
     options.push(OPTIONS.scout as PlanOption);
-    reasons.push('採用人数が3人以上のため、スカウト機能で候補者に直接アプローチ');
   }
 
   // 採用時期が急な場合
   if (input.desiredHiringPeriod === '1ヶ月以内' && input.hiringCount >= 3) {
     options.push(OPTIONS.premiumScout as PlanOption);
-    reasons.push('採用時期が1ヶ月以内のため、プレミアムスカウトで開封率を最大化');
   }
 
   // 露出強化オプション
   const difficultyScore = calculateDifficultyScore(input);
   if (difficultyScore > 2.0 && input.hiringCount >= 5) {
     options.push(OPTIONS.topReserve as PlanOption);
-    reasons.push('採用難易度が高く採用人数が多いため、検索トップリザーブシートで露出を確保');
   }
 
   if (input.hiringCount >= 10) {
     options.push(OPTIONS.platinumPlus as PlanOption);
-    reasons.push('大量採用のため、プラチナプラスで検索結果での上位表示を強化');
   }
 
   return options;
 }
 
 /**
+ * チケットプランを提案
+ */
+function selectTicketPlans(selectedPlanId: string, hiringCount: number, desiredPeriod: string): TicketPlan[] {
+  const plans: TicketPlan[] = [];
+  const ticketPrices = TICKET_PLANS[selectedPlanId];
+  const basePricePerCruel = PLANS[selectedPlanId as keyof typeof PLANS].price;
+
+  // 各チケットプランを作成
+  for (const [cruel, price] of Object.entries(ticketPrices)) {
+    const cruelNum = parseInt(cruel);
+    const savingsPercentage = Math.round(
+      ((basePricePerCruel * cruelNum - price) / (basePricePerCruel * cruelNum)) * 100
+    );
+    plans.push({
+      id: `ticket-${cruel}`,
+      name: `${cruel}クール（${cruelNum * 4}週間）`,
+      period: `${cruelNum * 4}週間`,
+      price,
+      savingsPercentage,
+    });
+  }
+
+  return plans;
+}
+
+/**
  * 提案を生成
  */
 export function generateProposal(input: ProposalInput): ProposalOutput {
-  const difficultyScore = calculateDifficultyScore(input);
+  const difficultyBreakdown = calculateDifficultyBreakdown(input);
+  const difficultyScore = (difficultyBreakdown.target + difficultyBreakdown.count + difficultyBreakdown.jobType + difficultyBreakdown.period) / 4;
   const selectedPlanId = selectPlan(difficultyScore, input.budget);
   const selectedPlan = PLANS[selectedPlanId as keyof typeof PLANS];
   const selectedOptions = selectOptions(input, selectedPlanId);
+  const ticketPlans = selectTicketPlans(selectedPlanId, input.hiringCount, input.desiredHiringPeriod);
 
   // 金額計算
   const basePlanPrice = selectedPlan.price;
@@ -298,11 +388,22 @@ export function generateProposal(input: ProposalInput): ProposalOutput {
     selectedReason = '予算に合わせて最小限のプランを選定しました。オプション追加で効果を高めることをお勧めします。';
   }
 
+  // チケット推奨理由
+  let ticketRecommendation = '';
+  if (input.desiredHiringPeriod === '6ヶ月以上' || input.hiringCount >= 10) {
+    ticketRecommendation = '複数クールの掲載を検討することで、1クール当たりの料金を削減できます。';
+  } else if (input.desiredHiringPeriod === '3-6ヶ月') {
+    ticketRecommendation = '3クール以上の掲載で、継続的な採用活動が可能になります。';
+  } else {
+    ticketRecommendation = '長期的な採用計画がある場合は、チケットプランで割引を活用できます。';
+  }
+
   return {
     plan: {
       ...selectedPlan,
       price: basePlanPrice,
     },
+    ticketPlans,
     options: selectedOptions,
     pricing: {
       basePlan: basePlanPrice,
@@ -313,8 +414,9 @@ export function generateProposal(input: ProposalInput): ProposalOutput {
     },
     reasoning: {
       difficultyScore,
+      difficultyBreakdown,
       selectedReason,
-      optionReasons: selectOptions(input, selectedPlanId).map((_, i) => {
+      optionReasons: selectedOptions.map((_, i) => {
         const reasons: string[] = [];
         if (input.hiringCount >= 5) {
           reasons.push('採用人数が5人以上のため、スカウト代行で効率的な採用活動が可能');
@@ -322,7 +424,7 @@ export function generateProposal(input: ProposalInput): ProposalOutput {
         if (input.desiredHiringPeriod === '1ヶ月以内' && input.hiringCount >= 3) {
           reasons.push('採用時期が1ヶ月以内のため、プレミアムスカウトで開封率を最大化');
         }
-        if (calculateDifficultyScore(input) > 2.0 && input.hiringCount >= 5) {
+        if (difficultyScore > 2.0 && input.hiringCount >= 5) {
           reasons.push('採用難易度が高く採用人数が多いため、検索トップリザーブシートで露出を確保');
         }
         if (input.hiringCount >= 10) {
@@ -330,6 +432,7 @@ export function generateProposal(input: ProposalInput): ProposalOutput {
         }
         return reasons[i] || '';
       }),
+      ticketRecommendation,
     },
   };
 }
