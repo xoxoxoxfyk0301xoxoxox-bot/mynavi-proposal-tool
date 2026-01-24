@@ -1,8 +1,10 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { ProposalOutput, ProposalInput } from '@/lib/proposalEngine';
-import { CheckCircle2, TrendingUp, Zap, BarChart3 } from 'lucide-react';
+import { CheckCircle2, TrendingUp, Zap, BarChart3, Download, Printer } from 'lucide-react';
 import ProposalLogicExplainer from './ProposalLogicExplainer';
+import { downloadProposalPdf } from '@/lib/proposalPdfGenerator';
 
 interface ProposalResultProps {
   proposal: ProposalOutput;
@@ -245,6 +247,30 @@ export default function ProposalResult({ proposal, input }: ProposalResultProps)
             <span className="text-2xl font-bold text-primary font-mono">
               {formatPrice(proposal.totalPriceWithTax)}
             </span>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* 提案書出力 */}
+      <Card className="card-elevated bg-gradient-to-r from-primary/5 to-accent/5">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Download className="w-5 h-5 text-primary" />
+            提案書をダウンロード
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            提案内容をPDF形式の提案書として出力できます。営業資料としてご利用ください。
+          </p>
+          <div className="flex gap-2">
+            <Button
+              onClick={() => downloadProposalPdf(input, proposal)}
+              className="flex-1 bg-primary hover:bg-primary/90"
+            >
+              <Printer className="w-4 h-4 mr-2" />
+              提案書を表示・印刷
+            </Button>
           </div>
         </CardContent>
       </Card>
