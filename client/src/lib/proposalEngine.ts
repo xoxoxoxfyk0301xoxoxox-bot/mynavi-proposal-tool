@@ -40,6 +40,16 @@ export interface ProposalOutput {
   };
   selectionReason: string;
   appliedCampaigns: CampaignData[];
+  locationBias: {
+    prefecture: string;
+    biasValue: number;
+    biasDescription: string;
+  };
+  planSelectionDetails: {
+    recommendedByJobType: string | null;
+    jobTypeDistribution: Record<string, number> | null;
+    selectionLogic: string;
+  };
 }
 
 // 難易度スコア計算用の定数
@@ -328,6 +338,16 @@ export function generateProposal(input: ProposalInput): ProposalOutput {
     difficultyBreakdown,
     selectionReason: generateSelectionReason(selectedPlan, difficultyScore, input),
     appliedCampaigns: applicableCampaigns,
+    locationBias: {
+      prefecture: input.location,
+      biasValue: calculateLocationAndJobTypeBias(input.location, input.jobType).locationBias,
+      biasDescription: `${input.location}の有効求人倍率に基づいた難易度調整`,
+    },
+    planSelectionDetails: {
+      recommendedByJobType: getRecommendedPlanByJobType(input.jobType),
+      jobTypeDistribution: getJobPlanDistributionPercentage(input.jobType),
+      selectionLogic: `難易度スコア ${difficultyScore.toFixed(1)}/5 と予算 ${input.budget}万円に基づいて${selectedPlan}を選定。職種別掲載案件数では${getRecommendedPlanByJobType(input.jobType)}が最多。`,
+    },
   };
 }
 

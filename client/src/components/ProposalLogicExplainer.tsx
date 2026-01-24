@@ -209,6 +209,61 @@ export default function ProposalLogicExplainer({ input, proposal }: ProposalLogi
             </div>
           </div>
 
+          {/* 勤務地バイアスと企画選定詳細 */}
+          <div className="space-y-3">
+            <h3 className="font-semibold text-foreground">3-1. 勤務地バイアス</h3>
+            <div className="p-3 bg-muted rounded-lg">
+              <p className="text-xs text-muted-foreground mb-1">勤務地</p>
+              <p className="text-sm font-bold text-foreground">{proposal.locationBias.prefecture}</p>
+              <p className="text-xs text-muted-foreground mt-2">{proposal.locationBias.biasDescription}</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                難易度調整係数：{proposal.locationBias.biasValue.toFixed(2)}倍
+              </p>
+            </div>
+          </div>
+
+          {/* 企画選定の詳細 */}
+          <div className="space-y-3">
+            <h3 className="font-semibold text-foreground">3-2. 企画選定の詳細理由</h3>
+            <div className="p-3 bg-muted rounded-lg space-y-2">
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">職種別推奨企画</p>
+                <p className="text-sm font-bold text-foreground">
+                  {proposal.planSelectionDetails.recommendedByJobType || '該当なし'}
+                </p>
+              </div>
+              {proposal.planSelectionDetails.jobTypeDistribution && (
+                <div>
+                  <p className="text-xs text-muted-foreground mb-2">職種別掲載案件数の分布</p>
+                  <div className="space-y-1">
+                    {Object.entries(proposal.planSelectionDetails.jobTypeDistribution).map(([plan, percentage]) => (
+                      <div key={plan} className="flex justify-between items-center text-xs">
+                        <span className="text-muted-foreground">{plan}</span>
+                        <div className="flex items-center gap-2">
+                          <div className="w-20 h-2 bg-muted rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-primary"
+                              style={{ width: `${percentage}%` }}
+                            />
+                          </div>
+                          <span className="font-semibold text-foreground w-10 text-right">
+                            {percentage.toFixed(1)}%
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="pt-2 border-t">
+                <p className="text-xs text-muted-foreground mb-1">選定ロジック</p>
+                <p className="text-sm text-foreground">
+                  {proposal.planSelectionDetails.selectionLogic}
+                </p>
+              </div>
+            </div>
+          </div>
+
           {/* 難易度スコアの詳細説明 */}
           <div className="space-y-3 pt-3 border-t">
             <h3 className="font-semibold text-foreground">4. 難易度スコアの詳細ルール</h3>
