@@ -1,13 +1,18 @@
 import { useState } from 'react';
 import ProposalForm from '@/components/ProposalForm';
 import ProposalResult from '@/components/ProposalResult';
+import CaseDataUploader from '@/components/CaseDataUploader';
+import CaseExamples from '@/components/CaseExamples';
 import { ProposalInput, ProposalOutput, generateProposal } from '@/lib/proposalEngine';
+import { CaseData, findMatchedCases, MatchedCase } from '@/lib/caseDataMatcher';
 import { Sparkles } from 'lucide-react';
 
 export default function Home() {
   const [proposal, setProposal] = useState<ProposalOutput | null>(null);
   const [input, setInput] = useState<ProposalInput | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [caseData, setCaseData] = useState<CaseData[]>([]);
+  const [matchedCases, setMatchedCases] = useState<MatchedCase[]>([]);
 
   const handleGenerateProposal = (formInput: ProposalInput) => {
     setIsLoading(true);
@@ -16,8 +21,24 @@ export default function Home() {
     setTimeout(() => {
       const result = generateProposal(formInput);
       setProposal(result);
+
+      // 他社事例を検索
+      if (caseData.length > 0) {
+        const matched = findMatchedCases(formInput, caseData, result.plan.name, 3);
+        setMatchedCases(matched);
+      }
+
       setIsLoading(false);
     }, 500);
+  };
+
+  const handleCaseDataLoaded = (data: CaseData[]) => {
+    setCaseData(data);
+  };
+
+  const handleCaseDataCleared = () => {
+    setCaseData([]);
+    setMatchedCases([]);
   };
 
   return (
@@ -41,16 +62,28 @@ export default function Home() {
       <main className="container py-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* 左側：入力フォーム */}
-          <div className="lg:sticky lg:top-24 lg:h-fit">
+          <div className="lg:sticky lg:top-24 lg:h-fit space-y-6">
             <div className="form-gradient rounded-xl p-6">
               <ProposalForm onSubmit={handleGenerateProposal} isLoading={isLoading} />
             </div>
+
+            {/* 掲載実績データアップローダー */}
+            <CaseDataUploader
+              onDataLoaded={handleCaseDataLoaded}
+              onDataCleared={handleCaseDataCleared}
+              isLoaded={caseData.length > 0}
+            />
           </div>
 
           {/* 右側：提案結果 */}
-          <div>
+          <div className="space-y-6">
             {proposal && input ? (
-              <ProposalResult proposal={proposal} input={input} />
+              <>
+                <ProposalResult proposal={proposal} input={input} />
+
+                {/* 他社事例 */}
+                <CaseExamples cases={matchedCases} />
+              </>
             ) : (
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
