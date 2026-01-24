@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import ProposalForm from '@/components/ProposalForm';
 import ProposalResult from '@/components/ProposalResult';
 import CaseExamples from '@/components/CaseExamples';
-import { ProposalInput, ProposalOutput, generateProposal } from '@/lib/proposalEngine';
+import MultiProposalComparison from '@/components/MultiProposalComparison';
+import { ProposalInput, ProposalOutput, generateProposal, generateMultipleProposals, MultiProposalOutput } from '@/lib/proposalEngine';
 import { CaseData, findMatchedCases, MatchedCase } from '@/lib/caseDataMatcher';
 import { useCaseData } from '@/hooks/useCaseData';
 import { Sparkles, Settings } from 'lucide-react';
@@ -11,9 +12,11 @@ import { useLocation } from 'wouter';
 
 export default function Home() {
   const [proposal, setProposal] = useState<ProposalOutput | null>(null);
+  const [multiProposals, setMultiProposals] = useState<MultiProposalOutput | null>(null);
   const [input, setInput] = useState<ProposalInput | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [matchedCases, setMatchedCases] = useState<MatchedCase[]>([]);
+  const [showMultipleProposals, setShowMultipleProposals] = useState(false);
   const { caseData, isLoading: isCaseDataLoading } = useCaseData();
   const [, navigate] = useLocation();
 
@@ -23,7 +26,10 @@ export default function Home() {
     // Simulate async operation
     setTimeout(() => {
       const result = generateProposal(formInput);
+      const multiResult = generateMultipleProposals(formInput);
       setProposal(result);
+      setMultiProposals(multiResult);
+      setShowMultipleProposals(false);
 
       // 他社事例を検索
       if (caseData.length > 0) {
@@ -96,10 +102,37 @@ export default function Home() {
           <div className="space-y-6">
             {proposal && input ? (
               <>
-                <ProposalResult proposal={proposal} input={input} />
+                {/* 複数プラン表示の切り替え */}
+                {multiProposals && (
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() => setShowMultipleProposals(false)}
+                      variant={!showMultipleProposals ? "default" : "outline"}
+                      className="flex-1"
+                    >
+                      推奨プラン
+                    </Button>
+                    <Button
+                      onClick={() => setShowMultipleProposals(true)}
+                      variant={showMultipleProposals ? "default" : "outline"}
+                      className="flex-1"
+                    >
+                      複数プラン比較
+                    </Button>
+                  </div>
+                )}
 
-                {/* 他社事例 */}
-                <CaseExamples cases={matchedCases} />
+                {/* 複数プラン比較表示 */}
+                {showMultipleProposals && multiProposals ? (
+                  <MultiProposalComparison proposals={multiProposals} input={input} />
+                ) : (
+                  <>
+                    <ProposalResult proposal={proposal} input={input} />
+
+                    {/* 他社事例 */}
+                    <CaseExamples cases={matchedCases} />
+                  </>
+                )}
               </>
             ) : (
               <div className="flex flex-col items-center justify-center py-16 text-center">

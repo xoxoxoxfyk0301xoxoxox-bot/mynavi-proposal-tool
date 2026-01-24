@@ -97,6 +97,13 @@ const TICKET_PRICES: Record<string, TicketPricingData> = {
   'MT-D': { plan: 'MT-D', twoWeeks: 36, threeWeeks: 51, sixWeeks: 90, twelveWeeks: 150 },
 };
 
+
+export interface MultiProposalOutput {
+  recommendedPlan: ProposalOutput;
+  budgetOptimizedPlan: ProposalOutput;
+  highConversionPlan: ProposalOutput;
+}
+
 export interface TicketPricingData {
   plan: string;
   twoWeeks: number;
@@ -370,4 +377,28 @@ function generateSelectionReason(plan: string, score: number, input: ProposalInp
   }
 
   return reason;
+}
+
+/**
+ * 複数のプラン提案を生成
+ * ①採用確度を最優先にしたプラン
+ * ②予算内におさまる提案
+ * ③推奨プラン（難易度と予算のバランス）
+ */
+export function generateMultipleProposals(input: ProposalInput): MultiProposalOutput {
+  // 推奨プラン（通常の提案）
+  const recommendedPlan = generateProposal(input);
+
+  // 採用確度を最優先にしたプラン（予算度外視）
+  const highConversionInput = { ...input, budget: 999999 }; // 予算を無視
+  const highConversionProposal = generateProposal(highConversionInput);
+
+  // 予算内におさまる提案（現在の予算で最適なプラン）
+  const budgetOptimizedPlan = recommendedPlan;
+
+  return {
+    recommendedPlan,
+    budgetOptimizedPlan,
+    highConversionPlan: highConversionProposal,
+  };
 }
