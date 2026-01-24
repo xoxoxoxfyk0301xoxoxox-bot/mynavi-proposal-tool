@@ -1,6 +1,7 @@
 import { CampaignData } from './pricingData';
 import { getIndustryDifficultyModifier, getOccupationDifficultyModifier, estimateIndustryFromWebsite, OCCUPATIONS } from './masterData';
 import { calculateLocationAndJobTypeBias } from './difficultyBiasData';
+import { getRecommendedPlanByJobType, getJobPlanDistributionPercentage } from './jobPlanDistribution';
 
 export interface ProposalInput {
   companyName: string;
@@ -149,19 +150,37 @@ function calculateDifficultyScore(input: ProposalInput) {
 }
 
 /**
- * 難易度スコアに基づいて最適な企画を選択
+ * 難易度スコアと職種別掲載案件数に基づいて最適な企画を選択
  */
-function selectPlan(difficultyScore: number, budget: number): string {
+function selectPlan(difficultyScore: number, budget: number, jobType: string): string {
+  // 職種から推奨企画を取得
+  const recommendedByJobType = getRecommendedPlanByJobType(jobType);
+  
   // 予算とスコアの両方を考慮して企画を選択
+  let selectedPlan: string;
   if (difficultyScore >= 4.0) {
-    return budget >= 210 ? 'MT-S' : budget >= 135 ? 'MT-A' : 'MT-B';
+    selectedPlan = budget >= 210 ? 'MT-S' : budget >= 135 ? 'MT-A' : 'MT-B';
   } else if (difficultyScore >= 3.0) {
-    return budget >= 135 ? 'MT-A' : budget >= 87.5 ? 'MT-B' : 'MT-C';
+    selectedPlan = budget >= 135 ? 'MT-A' : budget >= 87.5 ? 'MT-B' : 'MT-C';
   } else if (difficultyScore >= 2.0) {
-    return budget >= 87.5 ? 'MT-B' : budget >= 60 ? 'MT-C' : 'MT-D';
+    selectedPlan = budget >= 87.5 ? 'MT-B' : budget >= 60 ? 'MT-C' : 'MT-D';
   } else {
-    return budget >= 60 ? 'MT-C' : 'MT-D';
+    selectedPlan = budget >= 60 ? 'MT-C' : 'MT-D';
   }
+  
+  // 職種別掲載案件数からの推奨が予算許可範囲内で企画を調整
+  if (recommendedByJobType) {
+    const PLAN_PRIORITY = ['MT-S', 'MT-A', 'MT-B', 'MT-C', 'MT-D'];
+    const selectedIndex = PLAN_PRIORITY.indexOf(selectedPlan);
+    const recommendedIndex = PLAN_PRIORITY.indexOf(recommendedByJobType);
+    
+    // 職種別推奨が選択された企画より上位であれば、推奨企画を優先
+    if (recommendedIndex <= selectedIndex) {
+      selectedPlan = recommendedByJobType;
+    }
+  }
+  
+  return selectedPlan;
 }
 
 /**
@@ -252,7 +271,7 @@ export function generateProposal(input: ProposalInput): ProposalOutput {
   const { score: difficultyScore, breakdown: difficultyBreakdown } = calculateDifficultyScore(input);
 
   // 最適な企画を選択
-  const selectedPlan = selectPlan(difficultyScore, input.budget);
+  const selectedPlan = selectPlan(difficultyScore, input.budget, input.jobType);
 
   // 推奨オプションを選択
   const selectedOptions = selectOptions(selectedPlan, difficultyScore, input.budget);
