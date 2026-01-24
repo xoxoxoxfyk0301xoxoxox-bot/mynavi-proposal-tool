@@ -1,18 +1,21 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import ProposalForm from '@/components/ProposalForm';
 import ProposalResult from '@/components/ProposalResult';
-import CaseDataUploader from '@/components/CaseDataUploader';
 import CaseExamples from '@/components/CaseExamples';
 import { ProposalInput, ProposalOutput, generateProposal } from '@/lib/proposalEngine';
 import { CaseData, findMatchedCases, MatchedCase } from '@/lib/caseDataMatcher';
-import { Sparkles } from 'lucide-react';
+import { useCaseData } from '@/hooks/useCaseData';
+import { Sparkles, Settings } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useLocation } from 'wouter';
 
 export default function Home() {
   const [proposal, setProposal] = useState<ProposalOutput | null>(null);
   const [input, setInput] = useState<ProposalInput | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [caseData, setCaseData] = useState<CaseData[]>([]);
   const [matchedCases, setMatchedCases] = useState<MatchedCase[]>([]);
+  const { caseData, isLoading: isCaseDataLoading } = useCaseData();
+  const [, navigate] = useLocation();
 
   const handleGenerateProposal = (formInput: ProposalInput) => {
     setIsLoading(true);
@@ -26,19 +29,12 @@ export default function Home() {
       if (caseData.length > 0) {
         const matched = findMatchedCases(formInput, caseData, result.plan.name, 3);
         setMatchedCases(matched);
+      } else {
+        setMatchedCases([]);
       }
 
       setIsLoading(false);
     }, 500);
-  };
-
-  const handleCaseDataLoaded = (data: CaseData[]) => {
-    setCaseData(data);
-  };
-
-  const handleCaseDataCleared = () => {
-    setCaseData([]);
-    setMatchedCases([]);
   };
 
   return (
@@ -46,14 +42,27 @@ export default function Home() {
       {/* ヘッダー */}
       <header className="border-b border-border sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container py-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-              <Sparkles className="w-6 h-6 text-white" />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+                <Sparkles className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-foreground">マイナビ転職 提案自動化ツール</h1>
+                <p className="text-xs text-muted-foreground">採用情報から最適な掲載プランを自動提案</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-xl font-bold text-foreground">マイナビ転職 提案自動化ツール</h1>
-              <p className="text-xs text-muted-foreground">採用情報から最適な掲載プランを自動提案</p>
-            </div>
+
+            {/* 管理画面へのリンク */}
+            <Button
+              onClick={() => navigate('/admin/case-data')}
+              variant="outline"
+              size="sm"
+              className="gap-2"
+            >
+              <Settings className="w-4 h-4" />
+              管理画面
+            </Button>
           </div>
         </div>
       </header>
@@ -67,12 +76,20 @@ export default function Home() {
               <ProposalForm onSubmit={handleGenerateProposal} isLoading={isLoading} />
             </div>
 
-            {/* 掲載実績データアップローダー */}
-            <CaseDataUploader
-              onDataLoaded={handleCaseDataLoaded}
-              onDataCleared={handleCaseDataCleared}
-              isLoaded={caseData.length > 0}
-            />
+            {/* データ状態表示 */}
+            <div className="p-4 bg-muted/50 rounded-lg border border-border text-sm">
+              {isCaseDataLoading ? (
+                <p className="text-muted-foreground">事例データを読み込み中...</p>
+              ) : caseData.length > 0 ? (
+                <p className="text-accent font-semibold">
+                  ✓ {caseData.length}件の事例データが利用可能です
+                </p>
+              ) : (
+                <p className="text-muted-foreground">
+                  事例データが登録されていません
+                </p>
+              )}
+            </div>
           </div>
 
           {/* 右側：提案結果 */}

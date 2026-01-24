@@ -32,7 +32,7 @@ export default function CaseExamples({ cases, isLoading = false }: CaseExamplesP
             他社事例
           </CardTitle>
           <CardDescription>
-            Excelファイルをアップロードすると、類似条件の他社事例が表示されます
+            類似条件の事例がありません
           </CardDescription>
         </CardHeader>
       </Card>
