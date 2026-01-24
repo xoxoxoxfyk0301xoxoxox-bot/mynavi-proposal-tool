@@ -55,7 +55,7 @@ export default function Home() {
 
             {/* 管理画面へのリンク */}
             <Button
-              onClick={() => navigate('/admin/case-data')}
+              onClick={() => navigate('/admin/login')}
               variant="outline"
               size="sm"
               className="gap-2"

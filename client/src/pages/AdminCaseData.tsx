@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useAdminAuth } from '@/hooks/useAdminAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -13,6 +14,7 @@ import {
 } from '@/lib/pricingData';
 
 export default function AdminCaseData() {
+  useAdminAuth();
   const [caseData, setCaseData] = useState<CaseData[]>([]);
   const [pricingData, setPricingData] = useState<PricingData[]>([]);
   const [ticketPricingData, setTicketPricingData] = useState<TicketPricingData[]>([]);
@@ -256,13 +258,20 @@ export default function AdminCaseData() {
     <div className="min-h-screen bg-background">
       {/* ヘッダー */}
       <header className="border-b border-border sticky top-0 z-50 bg-background/95 backdrop-blur">
-        <div className="container py-4">
-          <h1 className="text-2xl font-bold text-foreground">
-            管理画面 - データ管理
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            事例データ、料金表、キャンペーン情報をアップロードして、利用者への提示する情報を管理します
-          </p>
+        <div className="container py-4 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">
+              管理画面 - データ管理
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              事例データ、料金表、キャンペーン情報をアップロードして、利用者への提示する情報を管理します
+            </p>
+          </div>
+          <a href="/admin/settings">
+            <Button variant="outline" size="sm">
+              ⚙️ 設定
+            </Button>
+          </a>
         </div>
       </header>
 
