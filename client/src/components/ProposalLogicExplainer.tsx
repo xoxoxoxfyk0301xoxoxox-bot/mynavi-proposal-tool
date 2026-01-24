@@ -59,7 +59,7 @@ export default function ProposalLogicExplainer({ input, proposal }: ProposalLogi
 
   // 現在のプランがどのルールに該当するか
   const getCurrentRuleIndex = () => {
-    const score = proposal.reasoning.difficultyScore;
+    const score = proposal.difficultyScore;
     const budgetInYen = input.budget * 10000;
 
     if (budgetInYen >= 1200000 && score > 2.5) return 0;
@@ -102,22 +102,22 @@ export default function ProposalLogicExplainer({ input, proposal }: ProposalLogi
             <div className="grid grid-cols-2 gap-3">
               <div className="p-3 bg-muted rounded-lg">
                 <p className="text-xs font-semibold text-muted-foreground mb-1">採用ターゲット</p>
-                <p className="text-sm font-bold text-foreground">{proposal.reasoning.difficultyBreakdown.target.toFixed(2)}</p>
+                <p className="text-sm font-bold text-foreground">{proposal.difficultyBreakdown.targetAudienceDifficulty.toFixed(2)}</p>
                 <p className="text-xs text-muted-foreground mt-1">{input.targetAudience}</p>
               </div>
               <div className="p-3 bg-muted rounded-lg">
                 <p className="text-xs font-semibold text-muted-foreground mb-1">採用人数</p>
-                <p className="text-sm font-bold text-foreground">{proposal.reasoning.difficultyBreakdown.count.toFixed(2)}</p>
+                <p className="text-sm font-bold text-foreground">{proposal.difficultyBreakdown.hiringCountDifficulty.toFixed(2)}</p>
                 <p className="text-xs text-muted-foreground mt-1">{input.hiringCount}人</p>
               </div>
               <div className="p-3 bg-muted rounded-lg">
                 <p className="text-xs font-semibold text-muted-foreground mb-1">職種</p>
-                <p className="text-sm font-bold text-foreground">{proposal.reasoning.difficultyBreakdown.jobType.toFixed(2)}</p>
+                <p className="text-sm font-bold text-foreground">{proposal.difficultyBreakdown.jobTypeDifficulty.toFixed(2)}</p>
                 <p className="text-xs text-muted-foreground mt-1">{input.jobType}</p>
               </div>
               <div className="p-3 bg-muted rounded-lg">
                 <p className="text-xs font-semibold text-muted-foreground mb-1">採用時期</p>
-                <p className="text-sm font-bold text-foreground">{proposal.reasoning.difficultyBreakdown.period.toFixed(2)}</p>
+                <p className="text-sm font-bold text-foreground">{proposal.difficultyBreakdown.dateUrgencyDifficulty.toFixed(2)}</p>
                 <p className="text-xs text-muted-foreground mt-1">{input.desiredHiringPeriod}</p>
               </div>
             </div>
@@ -125,10 +125,10 @@ export default function ProposalLogicExplainer({ input, proposal }: ProposalLogi
             <div className="p-3 bg-primary/10 rounded-lg border border-primary/20">
               <p className="text-xs text-muted-foreground mb-1">難易度スコア（平均値）</p>
               <p className="text-2xl font-bold text-primary">
-                {proposal.reasoning.difficultyScore.toFixed(2)} / 5.0
+                {proposal.difficultyScore.toFixed(2)} / 5.0
               </p>
               <p className="text-xs text-muted-foreground mt-2">
-                {getDifficultyExplanation(proposal.reasoning.difficultyScore)}
+                {getDifficultyExplanation(proposal.difficultyScore)}
               </p>
             </div>
           </div>
@@ -175,13 +175,13 @@ export default function ProposalLogicExplainer({ input, proposal }: ProposalLogi
               <div className="p-3 bg-muted rounded-lg">
                 <p className="text-xs text-muted-foreground mb-1">難易度スコア</p>
                 <p className="text-lg font-bold text-foreground">
-                  {proposal.reasoning.difficultyScore.toFixed(2)}
+                  {proposal.difficultyScore.toFixed(2)}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {proposal.reasoning.difficultyScore > 2.5 ? '> 2.5' :
-                   proposal.reasoning.difficultyScore > 2.0 ? '> 2.0' :
-                   proposal.reasoning.difficultyScore > 1.5 ? '> 1.5' :
-                   proposal.reasoning.difficultyScore > 1.0 ? '> 1.0' : '≤ 1.0'}
+                  {proposal.difficultyScore > 2.5 ? '> 2.5' :
+                   proposal.difficultyScore > 2.0 ? '> 2.0' :
+                   proposal.difficultyScore > 1.5 ? '> 1.5' :
+                   proposal.difficultyScore > 1.0 ? '> 1.0' : '≤ 1.0'}
                 </p>
               </div>
 
@@ -204,7 +204,7 @@ export default function ProposalLogicExplainer({ input, proposal }: ProposalLogi
                 ✓ 選定されたプラン：{proposal.plan.name}
               </p>
               <p className="text-sm text-muted-foreground">
-                {proposal.reasoning.selectedReason}
+                {proposal.selectionReason}
               </p>
             </div>
           </div>

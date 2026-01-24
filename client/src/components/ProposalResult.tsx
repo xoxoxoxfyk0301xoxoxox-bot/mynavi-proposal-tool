@@ -15,10 +15,10 @@ export default function ProposalResult({ proposal, input }: ProposalResultProps)
       style: 'currency',
       currency: 'JPY',
       minimumFractionDigits: 0,
-    }).format(price);
+    }).format(price * 10000);
   };
 
-  const difficultyPercentage = Math.min((proposal.reasoning.difficultyScore / 5) * 100, 100);
+  const difficultyPercentage = Math.min((proposal.difficultyScore / 5) * 100, 100);
 
   // 難易度の詳細説明
   const getDifficultyLabel = (value: number) => {
@@ -48,202 +48,211 @@ export default function ProposalResult({ proposal, input }: ProposalResultProps)
             <div className="flex items-center gap-3">
               <div className="flex-1 bg-muted rounded-full h-2 overflow-hidden">
                 <div
-                  className="bg-gradient-to-r from-primary to-accent h-full transition-all duration-300"
+                  className="h-full bg-gradient-to-r from-primary to-accent transition-all"
                   style={{ width: `${difficultyPercentage}%` }}
                 />
               </div>
-              <span className="text-sm font-semibold text-foreground min-w-fit">
-                {proposal.reasoning.difficultyScore.toFixed(2)} / 5.0
+              <span className="text-lg font-bold text-primary">
+                {proposal.difficultyScore.toFixed(1)}/5.0
               </span>
             </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              {getDifficultyLabel(proposal.difficultyScore)}
+            </p>
           </div>
 
-          {/* 難易度の詳細内訳 */}
-          <div className="grid grid-cols-2 gap-3 pt-2 border-t">
-            <div className="text-xs">
-              <p className="text-muted-foreground">採用ターゲット難易度</p>
-              <p className="font-semibold text-foreground">{proposal.reasoning.difficultyBreakdown.target.toFixed(2)}</p>
-            </div>
-            <div className="text-xs">
-              <p className="text-muted-foreground">採用人数難易度</p>
-              <p className="font-semibold text-foreground">{proposal.reasoning.difficultyBreakdown.count.toFixed(2)}</p>
-            </div>
-            <div className="text-xs">
-              <p className="text-muted-foreground">職種難易度</p>
-              <p className="font-semibold text-foreground">{proposal.reasoning.difficultyBreakdown.jobType.toFixed(2)}</p>
-            </div>
-            <div className="text-xs">
-              <p className="text-muted-foreground">採用時期難易度</p>
-              <p className="font-semibold text-foreground">{proposal.reasoning.difficultyBreakdown.period.toFixed(2)}</p>
+          <div className="bg-muted/50 rounded-lg p-3 space-y-2">
+            <p className="text-sm font-semibold text-foreground">難易度の内訳：</p>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div>
+                <span className="text-muted-foreground">ターゲット：</span>
+                <span className="font-semibold ml-1">
+                  {proposal.difficultyBreakdown.targetAudienceDifficulty.toFixed(1)}
+                </span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">採用人数：</span>
+                <span className="font-semibold ml-1">
+                  {proposal.difficultyBreakdown.hiringCountDifficulty.toFixed(1)}
+                </span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">職種：</span>
+                <span className="font-semibold ml-1">
+                  {proposal.difficultyBreakdown.jobTypeDifficulty.toFixed(1)}
+                </span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">採用時期：</span>
+                <span className="font-semibold ml-1">
+                  {proposal.difficultyBreakdown.dateUrgencyDifficulty.toFixed(1)}
+                </span>
+              </div>
             </div>
           </div>
 
-          <p className="text-sm text-foreground leading-relaxed pt-2">
-            {proposal.reasoning.selectedReason}
-          </p>
+          <div className="border-t border-border pt-3">
+            <p className="text-sm text-foreground whitespace-pre-line">
+              {proposal.selectionReason}
+            </p>
+          </div>
         </CardContent>
       </Card>
 
-      {/* 基本企画 */}
-      <Card className="card-elevated">
+      {/* 推奨プラン */}
+      <Card className="card-elevated border-l-4 border-l-accent">
         <CardHeader>
-          <CardTitle>基本企画</CardTitle>
-          <CardDescription>推奨プラン</CardDescription>
+          <CardTitle className="flex items-center gap-2">
+            <CheckCircle2 className="w-5 h-5 text-accent" />
+            推奨プラン
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-start justify-between">
-            <div>
-              <h3 className="text-lg font-bold text-primary">{proposal.plan.name}</h3>
-              <p className="text-sm text-muted-foreground mt-1">掲載期間：{proposal.plan.period}</p>
-              <p className="text-sm text-muted-foreground">検索順位：{proposal.plan.searchRank}</p>
+          <div className="bg-accent/10 rounded-lg p-4 border border-accent/20">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-lg font-bold text-foreground">{proposal.plan.name}</h3>
+              <Badge variant="secondary">{proposal.plan.price}万円</Badge>
             </div>
-            <div className="text-right">
-              <p className="text-2xl font-bold text-primary font-mono">
-                {formatPrice(proposal.plan.price)}
-              </p>
-            </div>
+            <p className="text-sm text-muted-foreground">{proposal.plan.description}</p>
           </div>
 
-          <div className="pt-4 border-t">
-            <p className="text-sm font-semibold text-foreground mb-3">掲載可能な機能</p>
+          {/* オプション */}
+          {proposal.options.length > 0 && (
             <div className="space-y-2">
-              {proposal.plan.features.map((feature, idx) => (
-                <div key={idx} className="flex items-start gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-accent mt-0.5 flex-shrink-0" />
-                  <span className="text-sm text-foreground">{feature}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* チケットプラン */}
-      {proposal.ticketPlans.length > 0 && (
-        <Card className="card-elevated border-l-4 border-l-accent">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Zap className="w-5 h-5 text-accent" />
-              チケットプラン（長期掲載）
-            </CardTitle>
-            <CardDescription>複数クール掲載で割引が適用されます</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {proposal.ticketPlans.map((ticket) => (
-                <div key={ticket.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors">
-                  <div>
-                    <p className="font-semibold text-foreground">{ticket.name}</p>
-                    <p className="text-xs text-muted-foreground">掲載期間：{ticket.period}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-bold text-primary font-mono">{formatPrice(ticket.price)}</p>
-                    <Badge variant="secondary" className="mt-1">
-                      {ticket.savingsPercentage}%割引
-                    </Badge>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <p className="text-xs text-muted-foreground mt-4 pt-4 border-t">
-              💡 {proposal.reasoning.ticketRecommendation}
-            </p>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* オプション */}
-      {proposal.options.length > 0 && (
-        <Card className="card-elevated">
-          <CardHeader>
-            <CardTitle>推奨オプション</CardTitle>
-            <CardDescription>{proposal.options.length}個のオプションを提案</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {proposal.options.map((option, idx) => (
-                <div key={option.id} className="pb-4 border-b last:pb-0 last:border-b-0">
-                  <div className="flex items-start justify-between mb-2">
-                    <div>
-                      <h4 className="font-semibold text-foreground">{option.name}</h4>
-                      <p className="text-sm text-muted-foreground mt-1">{option.description}</p>
+              <p className="text-sm font-semibold text-foreground">推奨オプション</p>
+              <div className="space-y-2">
+                {proposal.options.map((option, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border border-border"
+                  >
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-foreground">{option.name}</p>
+                      <p className="text-xs text-muted-foreground">{option.description}</p>
                     </div>
-                    <Badge variant="secondary" className="ml-2 flex-shrink-0">
-                      <span className="font-mono">{formatPrice(option.price)}</span>
-                    </Badge>
+                    <span className="font-semibold text-primary ml-2">+{option.price}万円</span>
                   </div>
-                  <div className="flex flex-wrap gap-1 mt-3">
-                    {option.features.map((feature, featureIdx) => (
-                      <Badge key={featureIdx} variant="outline" className="text-xs">
-                        {feature}
-                      </Badge>
-                    ))}
-                  </div>
-                  {proposal.reasoning.optionReasons[idx] && (
-                    <p className="text-xs text-muted-foreground mt-2">
-                      💡 {proposal.reasoning.optionReasons[idx]}
-                    </p>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* キャンペーン情報 */}
+          {proposal.appliedCampaigns.length > 0 && (
+            <div className="space-y-2 p-3 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-800">
+              <p className="text-sm font-semibold text-green-900 dark:text-green-100">
+                🎉 適用可能なキャンペーン
+              </p>
+              {proposal.appliedCampaigns.map((campaign, idx) => (
+                <div key={idx} className="text-xs text-green-800 dark:text-green-200">
+                  <p className="font-semibold">{campaign.name}</p>
+                  <p>{campaign.description}</p>
+                  {campaign.discountType === 'percentage' ? (
+                    <p>割引：{campaign.discountValue}%</p>
+                  ) : (
+                    <p>割引：{campaign.discountValue}万円</p>
                   )}
                 </div>
               ))}
             </div>
-          </CardContent>
-        </Card>
-      )}
+          )}
+        </CardContent>
+      </Card>
 
-      {/* 金額サマリー */}
-      <Card className="card-elevated bg-gradient-to-br from-primary/5 to-accent/5 border-primary/20">
+      {/* チケットプラン */}
+      <Card className="card-elevated">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Zap className="w-5 h-5 text-primary" />
+            チケットプラン（長期掲載割引）
+          </CardTitle>
+          <CardDescription>
+            複数クール掲載で1クール当たりの料金を削減できます
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { label: '2クール', data: proposal.ticketPlans.twoWeeks },
+              { label: '3クール', data: proposal.ticketPlans.threeWeeks },
+              { label: '6クール', data: proposal.ticketPlans.sixWeeks },
+              { label: '12クール', data: proposal.ticketPlans.twelveWeeks },
+            ].map((ticket, idx) => (
+              <div
+                key={idx}
+                className="p-3 bg-muted/50 rounded-lg border border-border hover:border-primary/50 transition-colors"
+              >
+                <p className="text-sm font-semibold text-foreground mb-1">{ticket.label}</p>
+                <p className="text-xs text-muted-foreground mb-2">
+                  {formatPrice(ticket.data.price)}
+                </p>
+                {ticket.data.discount > 0 && (
+                  <>
+                    <p className="text-xs line-through text-muted-foreground">
+                      {formatPrice(ticket.data.price)}
+                    </p>
+                    <p className="text-sm font-bold text-accent">
+                      {formatPrice(ticket.data.discountedPrice)}
+                    </p>
+                    <Badge variant="outline" className="text-xs mt-1">
+                      {Math.round((ticket.data.discount / ticket.data.price) * 100)}%割引
+                    </Badge>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* 料金詳細 */}
+      <Card className="card-elevated">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <BarChart3 className="w-5 h-5 text-primary" />
-            金額サマリー
+            料金詳細
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
+        <CardContent className="space-y-3">
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-muted-foreground">基本プラン</span>
+            <span className="font-semibold font-mono">
+              {formatPrice(proposal.plan.price)}
+            </span>
+          </div>
+          {proposal.options.length > 0 && (
             <div className="flex justify-between items-center">
-              <span className="text-sm text-muted-foreground">基本企画料金</span>
+              <span className="text-sm text-muted-foreground">オプション料金</span>
               <span className="font-semibold font-mono">
-                {formatPrice(proposal.pricing.basePlan)}
+                {formatPrice(proposal.options.reduce((sum, opt) => sum + opt.price, 0))}
               </span>
             </div>
-            {proposal.pricing.optionsTotal > 0 && (
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">オプション料金</span>
-                <span className="font-semibold font-mono">
-                  {formatPrice(proposal.pricing.optionsTotal)}
-                </span>
-              </div>
-            )}
-            <div className="pt-3 border-t border-primary/20 flex justify-between items-center">
-              <span className="text-sm font-medium text-foreground">小計（税抜）</span>
-              <span className="font-semibold font-mono">
-                {formatPrice(proposal.pricing.subtotal)}
-              </span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-muted-foreground">消費税（10%）</span>
-              <span className="font-semibold font-mono">
-                {formatPrice(proposal.pricing.tax)}
-              </span>
-            </div>
-            <div className="pt-3 border-t border-primary/20 flex justify-between items-center bg-primary/10 rounded-lg p-3">
-              <span className="font-bold text-foreground">合計（税込）</span>
-              <span className="text-2xl font-bold text-primary font-mono">
-                {formatPrice(proposal.pricing.total)}
-              </span>
-            </div>
+          )}
+          <div className="pt-3 border-t border-primary/20 flex justify-between items-center">
+            <span className="text-sm font-medium text-foreground">小計（税抜）</span>
+            <span className="font-semibold font-mono">
+              {formatPrice(proposal.totalPrice)}
+            </span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-muted-foreground">消費税（10%）</span>
+            <span className="font-semibold font-mono">
+              {formatPrice((proposal.totalPriceWithTax - proposal.totalPrice))}
+            </span>
+          </div>
+          <div className="pt-3 border-t border-primary/20 flex justify-between items-center bg-primary/10 rounded-lg p-3">
+            <span className="font-bold text-foreground">合計（税込）</span>
+            <span className="text-2xl font-bold text-primary font-mono">
+              {formatPrice(proposal.totalPriceWithTax)}
+            </span>
           </div>
         </CardContent>
       </Card>
 
       {/* 注釈 */}
-      <div className="text-xs text-muted-foreground bg-muted/50 rounded-lg p-3 space-y-2">
+      <div className="text-xs text-muted-foreground bg-muted/50 rounded-lg p-3 border border-border">
         <p>
-          ※ この提案は入力情報に基づいた自動提案です。実際の提案内容はマイナビ転職の担当者と相談の上、決定してください。
-        </p>
-        <p>
-          💡 上部の「提案ロジックの詳細説明」をクリックすると、プラン選定ルールと難易度スコアの計算方法が表示されます。
+          💡 このツールは参考情報です。実際の掲載プランはマイナビ転職の担当者にご相談ください。
         </p>
       </div>
     </div>

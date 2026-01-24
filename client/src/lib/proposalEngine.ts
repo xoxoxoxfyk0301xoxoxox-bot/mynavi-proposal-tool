@@ -1,7 +1,4 @@
-/**
- * マイナビ転職 提案自動化エンジン
- * 入力情報から最適な提案内容を自動生成する
- */
+import { CampaignData, getApplicableCampaigns, TicketPricingData } from './pricingData';
 
 export interface ProposalInput {
   companyName: string;
@@ -11,430 +8,270 @@ export interface ProposalInput {
   hiringCount: number;
   targetAudience: string;
   desiredHiringPeriod: string;
-  budget: number; // 万円
+  budget: number;
 }
 
 export interface PlanOption {
-  id: string;
   name: string;
   price: number;
   description: string;
-  features: string[];
-}
-
-export interface TicketPlan {
-  id: string;
-  name: string;
-  period: string;
-  price: number;
-  savingsPercentage: number;
 }
 
 export interface ProposalOutput {
-  plan: {
-    id: string;
-    name: string;
-    price: number;
-    period: string;
-    features: string[];
-    searchRank: string;
-  };
-  ticketPlans: TicketPlan[];
+  plan: PlanOption;
   options: PlanOption[];
-  pricing: {
-    basePlan: number;
-    optionsTotal: number;
-    subtotal: number;
-    tax: number;
-    total: number;
+  ticketPlans: {
+    twoWeeks: { price: number; discountedPrice: number; discount: number };
+    threeWeeks: { price: number; discountedPrice: number; discount: number };
+    sixWeeks: { price: number; discountedPrice: number; discount: number };
+    twelveWeeks: { price: number; discountedPrice: number; discount: number };
   };
-  reasoning: {
-    difficultyScore: number;
-    difficultyBreakdown: {
-      target: number;
-      count: number;
-      jobType: number;
-      period: number;
-    };
-    selectedReason: string;
-    optionReasons: string[];
-    ticketRecommendation: string;
+  totalPrice: number;
+  totalPriceWithTax: number;
+  difficultyScore: number;
+  difficultyBreakdown: {
+    targetAudienceDifficulty: number;
+    hiringCountDifficulty: number;
+    jobTypeDifficulty: number;
+    dateUrgencyDifficulty: number;
   };
+  selectionReason: string;
+  appliedCampaigns: CampaignData[];
 }
 
-// チケット料金表
-const TICKET_PLANS: Record<string, Record<number, number>> = {
-  'MT-S': {
-    2: 2100000,
-    3: 3000000,
-    6: 5400000,
-    12: 9000000,
-  },
-  'MT-A': {
-    2: 1350000,
-    3: 1900000,
-    6: 3300000,
-    12: 5700000,
-  },
-  'MT-B': {
-    2: 875000,
-    3: 1150000,
-    6: 2100000,
-    12: 3600000,
-  },
-  'MT-C': {
-    2: 600000,
-    3: 800000,
-    6: 1500000,
-    12: 2400000,
-  },
-  'MT-D': {
-    2: 360000,
-    3: 510000,
-    6: 900000,
-    12: 1500000,
-  },
+// 難易度スコア計算用の定数
+const TARGET_AUDIENCE_DIFFICULTY: Record<string, number> = {
+  '新卒': 1.0,
+  '第二新卒': 1.5,
+  '一般転職': 2.0,
+  '管理職': 3.0,
+  'スペシャリスト': 5.0,
 };
 
-// 基本企画の定義
-const PLANS = {
-  'MT-S': {
-    id: 'MT-S',
-    name: 'MT-S企画',
-    price: 1200000,
-    period: '4週間',
-    features: [
-      '最優先表示',
-      '情報量最大',
-      '社員インタビュー掲載可',
-      '職種コード追加可',
-      'マイナビ編集部コメント掲載可',
-    ],
-    searchRank: '最上位',
-  },
-  'MT-A': {
-    id: 'MT-A',
-    name: 'MT-A企画',
-    price: 750000,
-    period: '4週間',
-    features: [
-      '上位表示',
-      '母集団形成に強力',
-      '社員インタビュー掲載可',
-      '職種コード追加可',
-      'マイナビ編集部コメント掲載可',
-    ],
-    searchRank: '上位',
-  },
-  'MT-B': {
-    id: 'MT-B',
-    name: 'MT-B企画',
-    price: 500000,
-    period: '4週間',
-    features: [
-      'バランス重視',
-      '標準的な露出',
-      '社員インタビュー掲載可',
-      '職種コード追加可',
-      'マイナビ編集部コメント掲載可',
-    ],
-    searchRank: '中位',
-  },
-  'MT-C': {
-    id: 'MT-C',
-    name: 'MT-C企画',
-    price: 350000,
-    period: '4週間',
-    features: [
-      'コスト重視',
-      '基本情報掲載',
-      '社員インタビュー掲載可',
-      'マイナビ編集部コメント掲載可',
-    ],
-    searchRank: '下位',
-  },
-  'MT-D': {
-    id: 'MT-D',
-    name: 'MT-D企画',
-    price: 200000,
-    period: '4週間',
-    features: [
-      '最小限の掲載',
-      '基本募集情報のみ',
-      '急ぎの採用向け',
-    ],
-    searchRank: '最下位',
-  },
+const JOB_TYPE_DIFFICULTY: Record<string, number> = {
+  'エンジニア': 4.5,
+  '営業': 2.0,
+  '企画': 3.0,
+  '管理': 2.5,
+  'その他': 2.0,
 };
 
-// オプションの定義
+// 基本企画の料金（万円）
+const BASE_PLANS = {
+  'MT-S': { price: 210, description: '最上位プラン - 検索結果トップ掲載' },
+  'MT-A': { price: 135, description: 'プレミアムプラン - 検索結果上位掲載' },
+  'MT-B': { price: 87.5, description: 'スタンダードプラン - 検索結果中位掲載' },
+  'MT-C': { price: 60, description: 'ベーシックプラン - 検索結果掲載' },
+  'MT-D': { price: 36, description: 'エコノミープラン - 掲載' },
+};
+
+// オプション料金（万円）
 const OPTIONS = {
-  premiumScout: {
-    id: 'premiumScout',
-    name: 'プレミアムスカウト',
-    price: 200000,
-    description: '求職者の受信BOX最上位に表示。開封率70-80%と高い。',
-    features: ['開封率70-80%', '最上位表示', '毎週2回配信可能'],
-  },
-  scoutProxy: {
-    id: 'scoutProxy',
-    name: 'スカウト代行',
-    price: 150000,
-    description: 'マイナビ担当者が採用条件にマッチした人材へ一括送信。',
-    features: ['専任担当者対応', '週2回配信', '大量採用向け'],
-  },
-  scout: {
-    id: 'scout',
-    name: 'スカウト',
-    price: 100000,
-    description: '企業が自ら候補者を選んで送信。コスト効率的。',
-    features: ['企業自身で配信', '候補者絞り込み可', 'コスト効率的'],
-  },
-  dailyApproach: {
-    id: 'dailyApproach',
-    name: 'デイリーアプローチ',
-    price: 200000,
-    description: '新規会員に毎日自動アプローチ。',
-    features: ['自動配信', '優先順位設定可', '継続的アプローチ'],
-  },
-  platinumPlus: {
-    id: 'platinumPlus',
-    name: 'プラチナプラス',
-    price: 300000,
-    description: '検索結果でさらに上位表示。露出を大幅強化。',
-    features: ['さらに上位表示', '露出強化', '大量採用向け'],
-  },
-  topReserve: {
-    id: 'topReserve',
-    name: '検索トップリザーブシート',
-    price: 250000,
-    description: '特定キーワードの検索結果トップを確保。',
-    features: ['トップ表示確保', 'キーワード指定可', '露出最大化'],
-  },
+  'スカウト機能': { price: 50, description: 'スカウト機能を追加' },
+  'プレミアムスカウト': { price: 80, description: 'プレミアムスカウト機能を追加' },
+  'プラチナオプション': { price: 150, description: 'プラチナオプション' },
+  'プラチナプラス': { price: 200, description: 'プラチナプラス' },
+  '検索トップリザーブシート': { price: 100, description: '検索トップリザーブシート' },
+  '露出強化': { price: 60, description: '露出強化オプション' },
+};
+
+// チケット料金（万円）
+const TICKET_PRICES: Record<string, TicketPricingData> = {
+  'MT-S': { plan: 'MT-S', twoWeeks: 210, threeWeeks: 300, sixWeeks: 540, twelveWeeks: 900 },
+  'MT-A': { plan: 'MT-A', twoWeeks: 135, threeWeeks: 190, sixWeeks: 330, twelveWeeks: 570 },
+  'MT-B': { plan: 'MT-B', twoWeeks: 87.5, threeWeeks: 115, sixWeeks: 210, twelveWeeks: 360 },
+  'MT-C': { plan: 'MT-C', twoWeeks: 60, threeWeeks: 80, sixWeeks: 150, twelveWeeks: 240 },
+  'MT-D': { plan: 'MT-D', twoWeeks: 36, threeWeeks: 51, sixWeeks: 90, twelveWeeks: 150 },
 };
 
 /**
- * 採用難易度スコアの詳細な内訳を計算
+ * 難易度スコアを計算
  */
-function calculateDifficultyBreakdown(input: ProposalInput): {
-  target: number;
-  count: number;
-  jobType: number;
-  period: number;
-} {
-  // ターゲット別難易度
-  const targetDifficulty: Record<string, number> = {
-    '新卒': 1,
-    '第二新卒': 2,
-    '経験者': 3,
-    '管理職': 4,
-    'スペシャリスト': 5,
-  };
+function calculateDifficultyScore(input: ProposalInput): { score: number; breakdown: any } {
+  const targetAudienceDifficulty = TARGET_AUDIENCE_DIFFICULTY[input.targetAudience] || 2.0;
+  
+  let hiringCountDifficulty = 1.0;
+  if (input.hiringCount >= 50) hiringCountDifficulty = 4.0;
+  else if (input.hiringCount >= 20) hiringCountDifficulty = 3.0;
+  else if (input.hiringCount >= 10) hiringCountDifficulty = 2.0;
+  else if (input.hiringCount >= 5) hiringCountDifficulty = 1.5;
 
-  // 採用人数別難易度
-  const countDifficulty =
-    input.hiringCount === 1 ? 1 :
-    input.hiringCount <= 3 ? 1.5 :
-    input.hiringCount <= 5 ? 2 :
-    input.hiringCount <= 10 ? 2.5 : 3;
+  const jobTypeDifficulty = JOB_TYPE_DIFFICULTY[input.jobType] || 2.0;
 
-  // 職種別難易度
-  const jobDifficulty: Record<string, number> = {
-    '営業': 1,
-    '事務': 1.2,
-    '企画': 1.5,
-    '技術職': 2,
-    'エンジニア': 2,
-    'IT': 2,
-    '管理職': 2.5,
-  };
+  let dateUrgencyDifficulty = 1.0;
+  const today = new Date();
+  const hiringDate = new Date(input.desiredHiringPeriod);
+  const daysUntilHiring = Math.floor((hiringDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  
+  if (daysUntilHiring <= 30) dateUrgencyDifficulty = 4.0;
+  else if (daysUntilHiring <= 60) dateUrgencyDifficulty = 3.0;
+  else if (daysUntilHiring <= 90) dateUrgencyDifficulty = 2.0;
+  else dateUrgencyDifficulty = 1.0;
 
-  // 採用時期別難易度
-  const periodDifficulty: Record<string, number> = {
-    '1ヶ月以内': 1.5,
-    '1-3ヶ月': 1.3,
-    '3-6ヶ月': 1,
-    '6ヶ月以上': 0.8,
-  };
-
-  const target = targetDifficulty[input.targetAudience] || 2;
-  const job = jobDifficulty[input.jobType] || 1.5;
-  const period = periodDifficulty[input.desiredHiringPeriod] || 1;
+  const totalScore = (targetAudienceDifficulty + hiringCountDifficulty + jobTypeDifficulty + dateUrgencyDifficulty) / 4;
 
   return {
-    target,
-    count: countDifficulty,
-    jobType: job,
-    period,
+    score: Math.min(5, Math.max(0, totalScore)),
+    breakdown: {
+      targetAudienceDifficulty,
+      hiringCountDifficulty,
+      jobTypeDifficulty,
+      dateUrgencyDifficulty,
+    },
   };
 }
 
 /**
- * 採用難易度スコアを計算
- */
-function calculateDifficultyScore(input: ProposalInput): number {
-  const breakdown = calculateDifficultyBreakdown(input);
-  return (breakdown.target + breakdown.count + breakdown.jobType + breakdown.period) / 4;
-}
-
-/**
- * 最適な基本企画を選定
+ * 難易度スコアに基づいて最適な企画を選択
  */
 function selectPlan(difficultyScore: number, budget: number): string {
-  // 予算から選定可能なプランを絞り込む
-  const budgetInYen = budget * 10000;
-
-  if (budgetInYen >= 1200000 && difficultyScore > 2.5) {
-    return 'MT-S';
+  // 予算とスコアの両方を考慮して企画を選択
+  if (difficultyScore >= 4.0) {
+    return budget >= 210 ? 'MT-S' : budget >= 135 ? 'MT-A' : 'MT-B';
+  } else if (difficultyScore >= 3.0) {
+    return budget >= 135 ? 'MT-A' : budget >= 87.5 ? 'MT-B' : 'MT-C';
+  } else if (difficultyScore >= 2.0) {
+    return budget >= 87.5 ? 'MT-B' : budget >= 60 ? 'MT-C' : 'MT-D';
+  } else {
+    return budget >= 60 ? 'MT-C' : 'MT-D';
   }
-  if (budgetInYen >= 750000 && difficultyScore > 2.0) {
-    return 'MT-A';
-  }
-  if (budgetInYen >= 500000 && difficultyScore > 1.5) {
-    return 'MT-B';
-  }
-  if (budgetInYen >= 350000 && difficultyScore > 1.0) {
-    return 'MT-C';
-  }
-  return 'MT-D';
 }
 
 /**
- * 推奨オプションを選定
+ * 推奨オプションを選択
  */
-function selectOptions(input: ProposalInput, selectedPlan: string): PlanOption[] {
-  const options: PlanOption[] = [];
+function selectOptions(plan: string, difficultyScore: number, budget: number): string[] {
+  const selectedOptions: string[] = [];
+  let remainingBudget = budget - BASE_PLANS[plan as keyof typeof BASE_PLANS].price;
 
-  // スカウト機能の提案
-  if (input.hiringCount >= 5) {
-    options.push(OPTIONS.scoutProxy as PlanOption);
-  } else if (input.hiringCount >= 3) {
-    options.push(OPTIONS.scout as PlanOption);
-  }
-
-  // 採用時期が急な場合
-  if (input.desiredHiringPeriod === '1ヶ月以内' && input.hiringCount >= 3) {
-    options.push(OPTIONS.premiumScout as PlanOption);
-  }
-
-  // 露出強化オプション（MT-Sのみ）
-  const difficultyScore = calculateDifficultyScore(input);
-  if (selectedPlan === 'MT-S') {
-    if (difficultyScore > 2.0 && input.hiringCount >= 5) {
-      options.push(OPTIONS.topReserve as PlanOption);
+  // MT-Sの場合のみプラチナオプションを提案
+  if (plan === 'MT-S') {
+    if (remainingBudget >= OPTIONS['プラチナオプション'].price) {
+      selectedOptions.push('プラチナオプション');
+      remainingBudget -= OPTIONS['プラチナオプション'].price;
     }
-
-    if (input.hiringCount >= 10) {
-      options.push(OPTIONS.platinumPlus as PlanOption);
+    if (remainingBudget >= OPTIONS['プラチナプラス'].price) {
+      selectedOptions.push('プラチナプラス');
+      remainingBudget -= OPTIONS['プラチナプラス'].price;
+    }
+    if (remainingBudget >= OPTIONS['検索トップリザーブシート'].price) {
+      selectedOptions.push('検索トップリザーブシート');
+      remainingBudget -= OPTIONS['検索トップリザーブシート'].price;
     }
   }
 
-  return options;
+  // 難易度が高い場合はスカウト機能を追加
+  if (difficultyScore >= 3.5) {
+    if (remainingBudget >= OPTIONS['プレミアムスカウト'].price) {
+      selectedOptions.push('プレミアムスカウト');
+      remainingBudget -= OPTIONS['プレミアムスカウト'].price;
+    } else if (remainingBudget >= OPTIONS['スカウト機能'].price) {
+      selectedOptions.push('スカウト機能');
+      remainingBudget -= OPTIONS['スカウト機能'].price;
+    }
+  } else if (difficultyScore >= 2.5) {
+    if (remainingBudget >= OPTIONS['スカウト機能'].price) {
+      selectedOptions.push('スカウト機能');
+      remainingBudget -= OPTIONS['スカウト機能'].price;
+    }
+  }
+
+  // 露出強化オプション
+  if (difficultyScore >= 2.0 && remainingBudget >= OPTIONS['露出強化'].price) {
+    selectedOptions.push('露出強化');
+  }
+
+  return selectedOptions;
 }
 
 /**
- * チケットプランを提案
+ * キャンペーンを適用して割引を計算
  */
-function selectTicketPlans(selectedPlanId: string, hiringCount: number, desiredPeriod: string): TicketPlan[] {
-  const plans: TicketPlan[] = [];
-  const ticketPrices = TICKET_PLANS[selectedPlanId];
-  const basePricePerCruel = PLANS[selectedPlanId as keyof typeof PLANS].price;
+function applyDiscount(price: number, campaigns: CampaignData[]): { discountedPrice: number; discount: number } {
+  let totalDiscount = 0;
 
-  // 各チケットプランを作成
-  for (const [cruel, price] of Object.entries(ticketPrices)) {
-    const cruelNum = parseInt(cruel);
-    const savingsPercentage = Math.round(
-      ((basePricePerCruel * cruelNum - price) / (basePricePerCruel * cruelNum)) * 100
-    );
-    plans.push({
-      id: `ticket-${cruel}`,
-      name: `${cruel}クール（${cruelNum * 4}週間）`,
-      period: `${cruelNum * 4}週間`,
-      price,
-      savingsPercentage,
-    });
+  for (const campaign of campaigns) {
+    if (campaign.discountType === 'percentage') {
+      totalDiscount += (price * campaign.discountValue) / 100;
+    } else {
+      totalDiscount += campaign.discountValue;
+    }
   }
 
-  return plans;
+  const discountedPrice = Math.max(0, price - totalDiscount);
+  return { discountedPrice, discount: totalDiscount };
 }
 
 /**
  * 提案を生成
  */
 export function generateProposal(input: ProposalInput): ProposalOutput {
-  const difficultyBreakdown = calculateDifficultyBreakdown(input);
-  const difficultyScore = (difficultyBreakdown.target + difficultyBreakdown.count + difficultyBreakdown.jobType + difficultyBreakdown.period) / 4;
-  const selectedPlanId = selectPlan(difficultyScore, input.budget);
-  const selectedPlan = PLANS[selectedPlanId as keyof typeof PLANS];
-  const selectedOptions = selectOptions(input, selectedPlanId);
-  const ticketPlans = selectTicketPlans(selectedPlanId, input.hiringCount, input.desiredHiringPeriod);
+  // 難易度スコアを計算
+  const { score: difficultyScore, breakdown: difficultyBreakdown } = calculateDifficultyScore(input);
 
-  // 金額計算
-  const basePlanPrice = selectedPlan.price;
-  const optionsTotal = selectedOptions.reduce((sum, opt) => sum + opt.price, 0);
-  const subtotal = basePlanPrice + optionsTotal;
-  const tax = Math.round(subtotal * 0.1);
-  const total = subtotal + tax;
+  // 最適な企画を選択
+  const selectedPlan = selectPlan(difficultyScore, input.budget);
 
-  // 選定理由
-  let selectedReason = '';
-  if (selectedPlanId === 'MT-S') {
-    selectedReason = '採用難易度が高く、最大限の露出と情報量が必要と判断しました。';
-  } else if (selectedPlanId === 'MT-A') {
-    selectedReason = '採用難易度が中程度以上で、母集団形成に強いプランが最適と判断しました。';
-  } else if (selectedPlanId === 'MT-B') {
-    selectedReason = 'コストと露出のバランスが取れたプランが最適と判断しました。';
-  } else if (selectedPlanId === 'MT-C') {
-    selectedReason = 'コストを抑えながら基本的な採用活動が可能なプランを選定しました。';
-  } else {
-    selectedReason = '予算に合わせて最小限のプランを選定しました。オプション追加で効果を高めることをお勧めします。';
-  }
+  // 推奨オプションを選択
+  const selectedOptions = selectOptions(selectedPlan, difficultyScore, input.budget);
 
-  // チケット推奨理由
-  let ticketRecommendation = '';
-  if (input.desiredHiringPeriod === '6ヶ月以上' || input.hiringCount >= 10) {
-    ticketRecommendation = '複数クールの掲載を検討することで、1クール当たりの料金を削減できます。';
-  } else if (input.desiredHiringPeriod === '3-6ヶ月') {
-    ticketRecommendation = '3クール以上の掲載で、継続的な採用活動が可能になります。';
-  } else {
-    ticketRecommendation = '長期的な採用計画がある場合は、チケットプランで割引を活用できます。';
+  // ローカルストレージからキャンペーンデータを取得
+  const storedCampaigns = localStorage.getItem('adminCampaignData');
+  const campaigns: CampaignData[] = storedCampaigns ? JSON.parse(storedCampaigns) : [];
+  const applicableCampaigns = getApplicableCampaigns(campaigns, selectedPlan);
+
+  // 基本企画の料金
+  const basePlanPrice = BASE_PLANS[selectedPlan as keyof typeof BASE_PLANS].price;
+
+  // オプションの合計料金
+  const optionsTotalPrice = selectedOptions.reduce((sum, opt) => {
+    return sum + (OPTIONS[opt as keyof typeof OPTIONS]?.price || 0);
+  }, 0);
+
+  // 合計料金
+  const totalPrice = basePlanPrice + optionsTotalPrice;
+
+  // キャンペーンを適用
+  const { discountedPrice, discount: totalDiscount } = applyDiscount(totalPrice, applicableCampaigns);
+
+  // チケット料金を計算
+  const ticketData = TICKET_PRICES[selectedPlan];
+  const { discountedPrice: twoWeeksDiscounted, discount: twoWeeksDiscount } = applyDiscount(ticketData.twoWeeks, applicableCampaigns);
+  const { discountedPrice: threeWeeksDiscounted, discount: threeWeeksDiscount } = applyDiscount(ticketData.threeWeeks, applicableCampaigns);
+  const { discountedPrice: sixWeeksDiscounted, discount: sixWeeksDiscount } = applyDiscount(ticketData.sixWeeks, applicableCampaigns);
+  const { discountedPrice: twelveWeeksDiscounted, discount: twelveWeeksDiscount } = applyDiscount(ticketData.twelveWeeks, applicableCampaigns);
+
+  const ticketPlans = {
+    twoWeeks: { price: ticketData.twoWeeks, discountedPrice: twoWeeksDiscounted, discount: twoWeeksDiscount },
+    threeWeeks: { price: ticketData.threeWeeks, discountedPrice: threeWeeksDiscounted, discount: threeWeeksDiscount },
+    sixWeeks: { price: ticketData.sixWeeks, discountedPrice: sixWeeksDiscounted, discount: sixWeeksDiscount },
+    twelveWeeks: { price: ticketData.twelveWeeks, discountedPrice: twelveWeeksDiscounted, discount: twelveWeeksDiscount },
+  };
+
+  // 選定理由を生成
+  let selectionReason = `採用難易度スコア ${difficultyScore.toFixed(1)} に基づいて、${selectedPlan} を推奨します。`;
+  if (applicableCampaigns.length > 0) {
+    const campaignNames = applicableCampaigns.map(c => c.name).join('、');
+    selectionReason += `\n現在、${campaignNames}が適用可能です。`;
   }
 
   return {
     plan: {
-      ...selectedPlan,
+      name: selectedPlan,
       price: basePlanPrice,
+      description: BASE_PLANS[selectedPlan as keyof typeof BASE_PLANS].description,
     },
+    options: selectedOptions.map(opt => ({
+      name: opt,
+      price: OPTIONS[opt as keyof typeof OPTIONS].price,
+      description: OPTIONS[opt as keyof typeof OPTIONS].description,
+    })),
     ticketPlans,
-    options: selectedOptions,
-    pricing: {
-      basePlan: basePlanPrice,
-      optionsTotal,
-      subtotal,
-      tax,
-      total,
-    },
-    reasoning: {
-      difficultyScore,
-      difficultyBreakdown,
-      selectedReason,
-      optionReasons: selectedOptions.map((_, i) => {
-        const reasons: string[] = [];
-        if (input.hiringCount >= 5) {
-          reasons.push('採用人数が5人以上のため、スカウト代行で効率的な採用活動が可能');
-        }
-        if (input.desiredHiringPeriod === '1ヶ月以内' && input.hiringCount >= 3) {
-          reasons.push('採用時期が1ヶ月以内のため、プレミアムスカウトで開封率を最大化');
-        }
-        if (difficultyScore > 2.0 && input.hiringCount >= 5) {
-          reasons.push('採用難易度が高く採用人数が多いため、検索トップリザーブシートで露出を確保');
-        }
-        if (input.hiringCount >= 10) {
-          reasons.push('大量採用のため、プラチナプラスで検索結果での上位表示を強化');
-        }
-        return reasons[i] || '';
-      }),
-      ticketRecommendation,
-    },
+    totalPrice: discountedPrice,
+    totalPriceWithTax: Math.round(discountedPrice * 1.1 * 100) / 100,
+    difficultyScore,
+    difficultyBreakdown,
+    selectionReason,
+    appliedCampaigns: applicableCampaigns,
   };
 }
