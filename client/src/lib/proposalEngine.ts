@@ -1,5 +1,6 @@
 import { CampaignData } from './pricingData';
 import { getIndustryDifficultyModifier, getOccupationDifficultyModifier, estimateIndustryFromWebsite, OCCUPATIONS } from './masterData';
+import { calculateLocationAndJobTypeBias } from './difficultyBiasData';
 
 export interface ProposalInput {
   companyName: string;
@@ -105,10 +106,13 @@ function calculateDifficultyScore(input: ProposalInput) {
   else if (input.hiringCount >= 10) hiringCountDifficulty = 2.0;
   else if (input.hiringCount >= 5) hiringCountDifficulty = 1.5;
 
+  // 職種と勤務地から難易度バイアスを取得
+  const { jobTypeBias, locationBias, combinedBias } = calculateLocationAndJobTypeBias(input.jobType, input.location);
+  
   // 職種から難易度を取得
   const occupationId = OCCUPATIONS.find(occ => occ.label === input.jobType)?.id || 'other';
   const occupationModifier = getOccupationDifficultyModifier(occupationId);
-  const jobTypeDifficulty = (JOB_TYPE_DIFFICULTY[input.jobType] || 2.0) * occupationModifier;
+  const jobTypeDifficulty = (JOB_TYPE_DIFFICULTY[input.jobType] || 2.0) * occupationModifier * jobTypeBias;
 
   let dateUrgencyDifficulty = 1.0;
   const today = new Date();
@@ -131,6 +135,7 @@ function calculateDifficultyScore(input: ProposalInput) {
 
   let totalScore = (targetAudienceDifficulty + hiringCountDifficulty + jobTypeDifficulty + dateUrgencyDifficulty) / 4;
   totalScore *= industryModifier;
+  totalScore *= locationBias;  // 勤務地による難易度調整を追加
 
   return {
     score: Math.min(5, Math.max(0, totalScore)),
