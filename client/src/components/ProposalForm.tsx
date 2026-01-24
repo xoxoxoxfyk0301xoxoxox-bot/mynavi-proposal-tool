@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ProposalInput } from '@/lib/proposalEngine';
+import { OCCUPATIONS } from '@/lib/masterData';
 import { useState } from 'react';
 
 interface ProposalFormProps {
@@ -77,14 +78,11 @@ export default function ProposalForm({ onSubmit, isLoading = false }: ProposalFo
                 <SelectValue placeholder="職種を選択" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="営業">営業</SelectItem>
-                <SelectItem value="事務">事務</SelectItem>
-                <SelectItem value="企画">企画</SelectItem>
-                <SelectItem value="技術職">技術職</SelectItem>
-                <SelectItem value="エンジニア">エンジニア</SelectItem>
-                <SelectItem value="IT">IT</SelectItem>
-                <SelectItem value="管理職">管理職</SelectItem>
-                <SelectItem value="その他">その他</SelectItem>
+                {OCCUPATIONS.map((occ) => (
+                  <SelectItem key={occ.id} value={occ.label}>
+                    {occ.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

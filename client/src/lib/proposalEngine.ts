@@ -1,4 +1,5 @@
-import { CampaignData, getApplicableCampaigns, TicketPricingData } from './pricingData';
+import { CampaignData } from './pricingData';
+import { getIndustryDifficultyModifier, getOccupationDifficultyModifier, estimateIndustryFromWebsite, OCCUPATIONS } from './masterData';
 
 export interface ProposalInput {
   companyName: string;
@@ -84,10 +85,18 @@ const TICKET_PRICES: Record<string, TicketPricingData> = {
   'MT-D': { plan: 'MT-D', twoWeeks: 36, threeWeeks: 51, sixWeeks: 90, twelveWeeks: 150 },
 };
 
+export interface TicketPricingData {
+  plan: string;
+  twoWeeks: number;
+  threeWeeks: number;
+  sixWeeks: number;
+  twelveWeeks: number;
+}
+
 /**
  * 難易度スコアを計算
  */
-function calculateDifficultyScore(input: ProposalInput): { score: number; breakdown: any } {
+function calculateDifficultyScore(input: ProposalInput) {
   const targetAudienceDifficulty = TARGET_AUDIENCE_DIFFICULTY[input.targetAudience] || 2.0;
   
   let hiringCountDifficulty = 1.0;
@@ -96,7 +105,10 @@ function calculateDifficultyScore(input: ProposalInput): { score: number; breakd
   else if (input.hiringCount >= 10) hiringCountDifficulty = 2.0;
   else if (input.hiringCount >= 5) hiringCountDifficulty = 1.5;
 
-  const jobTypeDifficulty = JOB_TYPE_DIFFICULTY[input.jobType] || 2.0;
+  // 職種から難易度を取得
+  const occupationId = OCCUPATIONS.find(occ => occ.label === input.jobType)?.id || 'other';
+  const occupationModifier = getOccupationDifficultyModifier(occupationId);
+  const jobTypeDifficulty = (JOB_TYPE_DIFFICULTY[input.jobType] || 2.0) * occupationModifier;
 
   let dateUrgencyDifficulty = 1.0;
   const today = new Date();
@@ -108,7 +120,17 @@ function calculateDifficultyScore(input: ProposalInput): { score: number; breakd
   else if (daysUntilHiring <= 90) dateUrgencyDifficulty = 2.0;
   else dateUrgencyDifficulty = 1.0;
 
-  const totalScore = (targetAudienceDifficulty + hiringCountDifficulty + jobTypeDifficulty + dateUrgencyDifficulty) / 4;
+  // ホームページから業種を推定し、難易度を調整
+  let industryModifier = 1.0;
+  if (input.homepage) {
+    const estimatedIndustry = estimateIndustryFromWebsite(input.homepage);
+    if (estimatedIndustry) {
+      industryModifier = getIndustryDifficultyModifier(estimatedIndustry);
+    }
+  }
+
+  let totalScore = (targetAudienceDifficulty + hiringCountDifficulty + jobTypeDifficulty + dateUrgencyDifficulty) / 4;
+  totalScore *= industryModifier;
 
   return {
     score: Math.min(5, Math.max(0, totalScore)),
@@ -138,13 +160,28 @@ function selectPlan(difficultyScore: number, budget: number): string {
 }
 
 /**
+ * 適用可能なキャンペーンを取得
+ */
+function getApplicableCampaigns(campaigns: CampaignData[], plan: string): CampaignData[] {
+  return campaigns.filter(campaign => {
+    if (!campaign.isActive) return false;
+    if (campaign.applicablePlans.length === 0) return true;
+    return campaign.applicablePlans.includes(plan);
+  });
+}
+
+/**
  * 推奨オプションを選択
  */
 function selectOptions(plan: string, difficultyScore: number, budget: number): string[] {
   const selectedOptions: string[] = [];
-  let remainingBudget = budget - BASE_PLANS[plan as keyof typeof BASE_PLANS].price;
+  let remainingBudget = budget;
 
-  // MT-Sの場合のみプラチナオプションを提案
+  // 基本企画の料金を差し引く
+  const planPrice = BASE_PLANS[plan as keyof typeof BASE_PLANS].price;
+  remainingBudget -= planPrice;
+
+  // MT-Sの場合、プラチナオプションを追加
   if (plan === 'MT-S') {
     if (remainingBudget >= OPTIONS['プラチナオプション'].price) {
       selectedOptions.push('プラチナオプション');
@@ -233,6 +270,7 @@ export function generateProposal(input: ProposalInput): ProposalOutput {
 
   // キャンペーンを適用
   const { discountedPrice, discount: totalDiscount } = applyDiscount(totalPrice, applicableCampaigns);
+  const totalPriceWithTax = Math.round(discountedPrice * 1.1 * 100) / 100;
 
   // チケット料金を計算
   const ticketData = TICKET_PRICES[selectedPlan];
@@ -248,13 +286,6 @@ export function generateProposal(input: ProposalInput): ProposalOutput {
     twelveWeeks: { price: ticketData.twelveWeeks, discountedPrice: twelveWeeksDiscounted, discount: twelveWeeksDiscount },
   };
 
-  // 選定理由を生成
-  let selectionReason = `採用難易度スコア ${difficultyScore.toFixed(1)} に基づいて、${selectedPlan} を推奨します。`;
-  if (applicableCampaigns.length > 0) {
-    const campaignNames = applicableCampaigns.map(c => c.name).join('、');
-    selectionReason += `\n現在、${campaignNames}が適用可能です。`;
-  }
-
   return {
     plan: {
       name: selectedPlan,
@@ -263,15 +294,36 @@ export function generateProposal(input: ProposalInput): ProposalOutput {
     },
     options: selectedOptions.map(opt => ({
       name: opt,
-      price: OPTIONS[opt as keyof typeof OPTIONS].price,
-      description: OPTIONS[opt as keyof typeof OPTIONS].description,
+      price: OPTIONS[opt as keyof typeof OPTIONS]?.price || 0,
+      description: OPTIONS[opt as keyof typeof OPTIONS]?.description || '',
     })),
     ticketPlans,
     totalPrice: discountedPrice,
-    totalPriceWithTax: Math.round(discountedPrice * 1.1 * 100) / 100,
+    totalPriceWithTax,
     difficultyScore,
     difficultyBreakdown,
-    selectionReason,
+    selectionReason: generateSelectionReason(selectedPlan, difficultyScore, input),
     appliedCampaigns: applicableCampaigns,
   };
+}
+
+function generateSelectionReason(plan: string, score: number, input: ProposalInput): string {
+  let reason = '';
+  
+  if (score >= 4.0) {
+    reason = `採用難易度が非常に高い（スコア: ${score.toFixed(1)}/5）ため、${plan}をお勧めします。`;
+  } else if (score >= 3.0) {
+    reason = `採用難易度が高い（スコア: ${score.toFixed(1)}/5）ため、${plan}をお勧めします。`;
+  } else if (score >= 2.0) {
+    reason = `採用難易度が中程度（スコア: ${score.toFixed(1)}/5）のため、${plan}をお勧めします。`;
+  } else {
+    reason = `採用難易度が低い（スコア: ${score.toFixed(1)}/5）のため、${plan}をお勧めします。`;
+  }
+
+  // 難易度が高い場合、チケット提案を推奨
+  if (score >= 3.0) {
+    reason += '\n\n難易度が高いため、長期掲載プラン（チケット）の利用も検討してください。複数クール掲載することで、より多くの候補者にリーチできます。';
+  }
+
+  return reason;
 }
