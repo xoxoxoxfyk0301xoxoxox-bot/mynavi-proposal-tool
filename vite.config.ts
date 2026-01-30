@@ -187,18 +187,3 @@ base: '/mynavi-proposal-tool/',
     },
   },
 });
-export default defineConfig({
-  base: '/mynavi-proposal-tool/',
-  build: {
-    outDir: path.resolve(import.meta.dirname, "dist"),
-    emptyOutDir: true,
-    rollupOptions: {
-      output: {
-        entryFileNames: 'assets/[name].js',  // ハッシュを固定
-        chunkFileNames: 'assets/[name].js',
-        assetFileNames: 'assets/[name].[ext]'
-      }
-    }
-  },
-  // ...
-});
