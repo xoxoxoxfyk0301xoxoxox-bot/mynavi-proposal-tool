@@ -25,7 +25,7 @@ jobs:
           node-version: '22'
       - run: npm install -g pnpm
       - run: pnpm install
-      - run: rm -rf dist/
+      - run: rm -rf dist/ node_modules/.vite
       - run: pnpm build
       - uses: actions/upload-pages-artifact@v3
         with:
